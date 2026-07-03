@@ -20,18 +20,18 @@ import (
 	metricnoop "go.opentelemetry.io/otel/metric/noop"
 )
 
-// Ref identifies a persisted snapshot.
+// Ref identifies a persisted snapshot
 type Ref struct {
 	URI string // provider-specific URI (e.g. s3://bucket/key, file:///path)
 	Key string // object key within the storage backend
 }
 
-// Extractor is an optional async consumer of snapshot bytes (Phase 2).
+// Extractor is an optional async consumer of snapshot bytes (Phase 2)
 type Extractor interface {
 	Extract(ctx context.Context, r io.Reader) error
 }
 
-// Recorder wraps a FlightRecorder, adding persistence, rate-limiting, and observability.
+// Recorder wraps a FlightRecorder, adding persistence, rate-limiting, and observability
 type Recorder struct {
 	fr        *trace.FlightRecorder
 	storage   Storage
@@ -41,7 +41,7 @@ type Recorder struct {
 	bufPool   sync.Pool
 }
 
-// Option configures a Recorder.
+// Option configures a Recorder
 type Option func(*config)
 
 type config struct {
@@ -54,39 +54,37 @@ type config struct {
 	extractor      Extractor
 }
 
-// WithStorage sets the persistence backend. Required.
+// WithStorage sets the persistence backend
 func WithStorage(s Storage) Option {
 	return func(c *config) { c.storage = s }
 }
 
-// WithMeterProvider sets the OTel meter provider. Defaults to noop.
+// WithMeterProvider sets the OTel meter provider
 func WithMeterProvider(mp metric.MeterProvider) Option {
 	return func(c *config) { c.meterProvider = mp }
 }
 
-// WithLoggerProvider sets the OTel logger provider. Defaults to noop.
+// WithLoggerProvider sets the OTel logger provider
 func WithLoggerProvider(lp otellog.LoggerProvider) Option {
 	return func(c *config) { c.loggerProvider = lp }
 }
 
-// WithRateLimit configures a token-bucket rate limiter.
-// min is the minimum gap between allowed snapshots; burst is the initial token count.
+// WithRateLimit configures a token-bucket rate limiter
 func WithRateLimit(min time.Duration, burst int) Option {
 	return func(c *config) { c.minInterval = min; c.burst = burst }
 }
 
-// WithResourceAttrs attaches resource attributes (e.g. service.name, host.name) to
-// every metric data point and log record emitted by this recorder.
+// WithResourceAttrs attaches resource attributes (e.g. service.name, host.name) to every metric data point and log record emitted by this recorder
 func WithResourceAttrs(kvs ...attribute.KeyValue) Option {
 	return func(c *config) { c.attrs = append(c.attrs, kvs...) }
 }
 
-// WithExtractor registers an optional async trace-byte consumer (Phase 2).
+// WithExtractor registers an optional async trace-byte consumer (Phase 2)
 func WithExtractor(e Extractor) Option {
 	return func(c *config) { c.extractor = e }
 }
 
-// New creates a Recorder. WithStorage is required; all other options are optional.
+// New creates a Recorder
 func New(fr *trace.FlightRecorder, opts ...Option) (*Recorder, error) {
 	cfg := &config{
 		minInterval: time.Second,
@@ -144,8 +142,7 @@ func (r *Recorder) Snapshot(ctx context.Context, reason string) (Ref, error) {
 		return Ref{}, fmt.Errorf("squawk: WriteTo: %w", err)
 	}
 
-	// data is valid for the lifetime of buf; pass via bytes.Reader so Put can read it
-	// while buf remains usable for the pool.
+	// data is valid for the lifetime of buf; pass via bytes.Reader so Put can read it while buf remains usable for the pool
 	data := buf.Bytes()
 	key := buildKey(reason, r.signal.attrs, start)
 

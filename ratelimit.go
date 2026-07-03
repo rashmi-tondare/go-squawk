@@ -6,8 +6,7 @@ import (
 	"time"
 )
 
-// rateLimiter is a simple token-bucket rate limiter.
-// Tokens refill at 1-per-minInterval up to burst capacity.
+// rateLimiter is a token-bucket rate limiter
 type rateLimiter struct {
 	mu      sync.Mutex
 	min     time.Duration
@@ -28,7 +27,7 @@ func newRateLimiter(min time.Duration, burst int) *rateLimiter {
 	}
 }
 
-// Allow returns true if a snapshot should proceed, false if it should be dropped.
+// Allow returns true if a snapshot should proceed, false if it should be dropped
 func (r *rateLimiter) Allow() bool {
 	r.mu.Lock()
 	defer r.mu.Unlock()

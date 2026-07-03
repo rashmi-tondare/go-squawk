@@ -70,8 +70,8 @@ func (s *signaler) recordDropped(ctx context.Context, reason string) {
 	)...))
 }
 
-// emitAlert fires a WARN log record so backends can alert on this event.
-// It fires on both success and storage_error so monitoring never misses a snapshot attempt.
+// emitAlert fires a WARN log record so backends can alert on this event
+// It fires on both success and storage_error so monitoring never misses a snapshot attempt
 func (s *signaler) emitAlert(ctx context.Context, reason, uri string, n int64) {
 	var rec otellog.Record
 	rec.SetSeverity(otellog.SeverityWarn)

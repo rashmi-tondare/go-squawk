@@ -1,10 +1,13 @@
 # go-squawk
 
-The name comes from aviation: a squawk code is the four-digit transponder signal a pilot sets to declare an emergency. It pairs intentionally with Go's `runtime/trace.FlightRecorder`: when your program detects something wrong, it squawks.
+The name comes from aviation: a squawk code is the four-digit transponder signal a pilot sets to declare an emergency.
+It pairs intentionally with Go's `runtime/trace.FlightRecorder`: when your program detects something wrong, it squawks.
 
-**go-squawk** captures a [Go execution trace](https://pkg.go.dev/runtime/trace) snapshot when your program detects an anomaly, persists it to durable storage, and emits an observable signal so your monitoring backend can alert on it.
+**go-squawk** captures a [Go execution trace](https://pkg.go.dev/runtime/trace) snapshot when your program detects an
+anomaly, persists it to durable storage, and emits an observable signal so your monitoring backend can alert on it.
 
-> **Note:** This library works with Go *execution* traces (viewable with `go tool trace`). It has nothing to do with OpenTelemetry distributed tracing.
+> **Note:** This library works with Go *execution* traces (viewable with `go tool trace`). It has nothing to do with
+> OpenTelemetry distributed tracing.
 
 ## How it works
 
@@ -14,7 +17,8 @@ When you call `Snapshot`, squawk:
 2. Uploads the bytes to your configured storage backend.
 3. Increments an OTel metric and emits a WARN log record so you can alert on the event.
 
-Storage failures still emit the signal. A rate limiter prevents a crash-loop from flooding storage; suppressed snapshots increment a `squawk.dropped` counter so suppression is never silent.
+Storage failures still emit the signal. A rate limiter prevents a crash-loop from flooding storage; suppressed snapshots
+increment a `squawk.dropped` counter so suppression is never silent.
 
 ## Installation
 
@@ -28,9 +32,9 @@ Requires Go 1.25+.
 
 ```go
 import (
-    "runtime/trace"
-    squawk "github.com/rashmi-tondare/go-squawk"
-    "go.opentelemetry.io/otel/attribute"
+"runtime/trace"
+squawk "github.com/rashmi-tondare/go-squawk"
+"go.opentelemetry.io/otel/attribute"
 )
 
 fr := trace.NewFlightRecorder(trace.FlightRecorderConfig{MinAge: 5 * time.Second})
@@ -38,17 +42,17 @@ fr.Start()
 defer fr.Stop()
 
 rec, err := squawk.New(fr,
-    squawk.WithStorage(&squawk.LocalStorage{Dir: "/var/traces"}),
-    squawk.WithMeterProvider(mp),   // your OTel MeterProvider
-    squawk.WithLoggerProvider(lp),  // your OTel LoggerProvider
-    squawk.WithResourceAttrs(
-        attribute.String("service.name", "my-service"),
-    ),
+squawk.WithStorage(&squawk.LocalStorage{Dir: "/var/traces"}),
+squawk.WithMeterProvider(mp), // your OTel MeterProvider
+squawk.WithLoggerProvider(lp), // your OTel LoggerProvider
+squawk.WithResourceAttrs(
+attribute.String("service.name", "my-service"),
+),
 )
 
 // Call this whenever you detect an anomaly.
 ref, err := rec.Snapshot(ctx, "high-latency")
-// ref.URI → "file:///var/traces/traces/my-service/2025-01-15/1234567890-high-latency.trace"
+// ref.URI -> "file:///var/traces/traces/my-service/2025-01-15/1234567890-high-latency.trace"
 ```
 
 Open the resulting file with `go tool trace <path>`.
@@ -69,8 +73,8 @@ No extra dependencies.
 
 ```go
 import (
-    "github.com/rashmi-tondare/go-squawk/storage/cloud"
-    _ "gocloud.dev/blob/s3blob"    // or gcsblob, azureblob, fileblob, memblob
+"github.com/rashmi-tondare/go-squawk/storage/cloud"
+_ "gocloud.dev/blob/s3blob" // or gcsblob, azureblob, fileblob, memblob
 )
 
 bucket, err := cloud.Open(ctx, "s3://my-bucket")
@@ -79,29 +83,34 @@ defer bucket.Close()
 squawk.WithStorage(bucket)
 ```
 
-The `storage/cloud` package wraps [gocloud.dev/blob](https://gocloud.dev/howto/blob/), so any backend it supports works here. Import the driver you need alongside the package.
+The `storage/cloud` package wraps [gocloud.dev/blob](https://gocloud.dev/howto/blob/), so any backend it supports works
+here. Import the driver you need alongside the package.
 
-Object keys follow the format `traces/{service}/{YYYY-MM-DD}/{unixnano}-{reason}.trace`. Retention is not managed by the library; use your bucket's lifecycle policies.
+Object keys follow the format `traces/{service}/{YYYY-MM-DD}/{unixnano}-{reason}.trace`. Retention is not managed by the
+library; use your bucket's lifecycle policies.
 
 ## OTel signals
 
 Every snapshot attempt emits:
 
-| Signal | Type | Attributes |
-|---|---|---|
-| `squawk.snapshots` | counter | `reason`, `outcome` (`ok` / `storage_error` / `write_error`) |
-| `squawk.bytes_written` | histogram | same |
-| `squawk.snapshot.duration` | histogram | same |
-| `squawk.dropped` | counter | `reason` |
+| Signal                     | Type      | Attributes                                                   |
+|----------------------------|-----------|--------------------------------------------------------------|
+| `squawk.snapshots`         | counter   | `reason`, `outcome` (`ok` / `storage_error` / `write_error`) |
+| `squawk.bytes_written`     | histogram | same                                                         |
+| `squawk.snapshot.duration` | histogram | same                                                         |
+| `squawk.dropped`           | counter   | `reason`                                                     |
 
-A WARN log record is also emitted with attributes `squawk.reason`, `squawk.uri`, `squawk.bytes`, plus any resource attributes you set via `WithResourceAttrs`. You can alert on either the metric or the log record in your monitoring backend.
+A WARN log record is also emitted with attributes `squawk.reason`, `squawk.uri`, `squawk.bytes`, plus any resource
+attributes you set via `WithResourceAttrs`. You can alert on either the metric or the log record in your monitoring
+backend.
 
-`WithMeterProvider` accepts any standard OTel `metric.MeterProvider`, so any exporter works: Prometheus, OTLP, Datadog, etc. For Prometheus:
+`WithMeterProvider` accepts any standard OTel `metric.MeterProvider`, so any exporter works: Prometheus, OTLP, Datadog,
+etc. For Prometheus:
 
 ```go
 import (
-    "go.opentelemetry.io/otel/exporters/prometheus"
-    sdkmetric "go.opentelemetry.io/otel/sdk/metric"
+"go.opentelemetry.io/otel/exporters/prometheus"
+sdkmetric "go.opentelemetry.io/otel/sdk/metric"
 )
 
 exp, _ := prometheus.New()
@@ -122,14 +131,14 @@ Suppressed snapshots return an empty `Ref` and no error, but always increment `s
 
 ## Options reference
 
-| Option | Description |
-|---|---|
-| `WithStorage(s)` | Storage backend. Required. |
-| `WithMeterProvider(mp)` | OTel meter provider. Defaults to noop. |
-| `WithLoggerProvider(lp)` | OTel logger provider. Defaults to noop. |
-| `WithRateLimit(min, burst)` | Token-bucket rate limit. Default: 1s / burst 1. |
-| `WithResourceAttrs(kvs...)` | Resource attributes added to every metric and log record. |
-| `WithExtractor(e)` | Async consumer of raw snapshot bytes. Runs in a goroutine; errors are ignored. |
+| Option                      | Description                                                                   |
+|-----------------------------|-------------------------------------------------------------------------------|
+| `WithStorage(s)`            | Storage backend                                                               |
+| `WithMeterProvider(mp)`     | OTel meter provider                                                           |
+| `WithLoggerProvider(lp)`    | OTel logger provider                                                          |
+| `WithRateLimit(min, burst)` | Token-bucket rate limit. Default: 1s / burst 1.                               |
+| `WithResourceAttrs(kvs...)` | Resource attributes added to every metric and log record                      |
+| `WithExtractor(e)`          | Async consumer of raw snapshot bytes. Runs in a goroutine; errors are ignored |
 
 ## Implementing your own storage
 
