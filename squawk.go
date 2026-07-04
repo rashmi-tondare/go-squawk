@@ -8,7 +8,6 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"io"
 	"runtime/trace"
 	"sync"
 	"time"
@@ -26,18 +25,12 @@ type Ref struct {
 	Key string // object key within the storage backend
 }
 
-// Extractor is an optional async consumer of snapshot bytes (Phase 2)
-type Extractor interface {
-	Extract(ctx context.Context, r io.Reader) error
-}
-
 // Recorder wraps a FlightRecorder, adding persistence, rate-limiting, and observability
 type Recorder struct {
 	fr          *trace.FlightRecorder
 	storage     Storage
 	signal      *signaler
 	limiter     *rateLimiter
-	extractor   Extractor
 	serviceName string
 	bufPool     sync.Pool
 }
@@ -52,7 +45,6 @@ type config struct {
 	minInterval    time.Duration
 	burst          int
 	attrs          []attribute.KeyValue
-	extractor      Extractor
 	serviceName    string
 }
 
@@ -86,11 +78,6 @@ func WithRateLimit(min time.Duration, burst int) Option {
 // metric data point and log record emitted by this recorder
 func WithResourceAttrs(kvs ...attribute.KeyValue) Option {
 	return func(c *config) { c.attrs = append(c.attrs, kvs...) }
-}
-
-// WithExtractor registers an optional async trace-byte consumer (Phase 2)
-func WithExtractor(e Extractor) Option {
-	return func(c *config) { c.extractor = e }
 }
 
 // New creates a Recorder
@@ -132,7 +119,6 @@ func New(fr *trace.FlightRecorder, opts ...Option) (*Recorder, error) {
 		storage:     cfg.storage,
 		signal:      sig,
 		limiter:     newRateLimiter(cfg.minInterval, cfg.burst),
-		extractor:   cfg.extractor,
 		serviceName: cfg.serviceName,
 		bufPool:     sync.Pool{New: func() any { return new(bytes.Buffer) }},
 	}, nil
@@ -174,12 +160,6 @@ func (r *Recorder) Snapshot(ctx context.Context, reason string) (Ref, error) {
 		uri = ref.URI
 	}
 	r.signal.emitAlert(ctx, reason, uri, n)
-
-	if r.extractor != nil {
-		extData := append([]byte(nil), data...) // independent copy for async goroutine
-		ext := r.extractor
-		go func() { _ = ext.Extract(context.WithoutCancel(ctx), bytes.NewReader(extData)) }()
-	}
 
 	buf.Reset()
 	r.bufPool.Put(buf)

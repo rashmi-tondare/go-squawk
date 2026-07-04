@@ -139,7 +139,6 @@ Suppressed snapshots return an empty `Ref` and no error, but always increment `s
 | `WithLoggerProvider(lp)`    | OTel logger provider                                                          |
 | `WithRateLimit(min, burst)` | Token-bucket rate limit. Default: 1s / burst 1.                               |
 | `WithResourceAttrs(kvs...)` | Additional resource attributes added to every metric and log record          |
-| `WithExtractor(e)`          | Async consumer of raw snapshot bytes. Runs in a goroutine; errors are ignored |
 
 ## Implementing your own storage
 
