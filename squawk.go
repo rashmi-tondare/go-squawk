@@ -33,12 +33,13 @@ type Extractor interface {
 
 // Recorder wraps a FlightRecorder, adding persistence, rate-limiting, and observability
 type Recorder struct {
-	fr        *trace.FlightRecorder
-	storage   Storage
-	signal    *signaler
-	limiter   *rateLimiter
-	extractor Extractor
-	bufPool   sync.Pool
+	fr          *trace.FlightRecorder
+	storage     Storage
+	signal      *signaler
+	limiter     *rateLimiter
+	extractor   Extractor
+	serviceName string
+	bufPool     sync.Pool
 }
 
 // Option configures a Recorder
@@ -52,11 +53,18 @@ type config struct {
 	burst          int
 	attrs          []attribute.KeyValue
 	extractor      Extractor
+	serviceName    string
 }
 
 // WithStorage sets the persistence backend
 func WithStorage(s Storage) Option {
 	return func(c *config) { c.storage = s }
+}
+
+// WithServiceName sets the service name used in the storage key path
+// and attached as the service.name attribute on every metric data point and log record
+func WithServiceName(name string) Option {
+	return func(c *config) { c.serviceName = name }
 }
 
 // WithMeterProvider sets the OTel meter provider
@@ -74,7 +82,8 @@ func WithRateLimit(min time.Duration, burst int) Option {
 	return func(c *config) { c.minInterval = min; c.burst = burst }
 }
 
-// WithResourceAttrs attaches resource attributes (e.g. service.name, host.name) to every metric data point and log record emitted by this recorder
+// WithResourceAttrs attaches resource attributes (e.g. host.name, environment) to every
+// metric data point and log record emitted by this recorder
 func WithResourceAttrs(kvs ...attribute.KeyValue) Option {
 	return func(c *config) { c.attrs = append(c.attrs, kvs...) }
 }
@@ -96,6 +105,9 @@ func New(fr *trace.FlightRecorder, opts ...Option) (*Recorder, error) {
 	if cfg.storage == nil {
 		return nil, fmt.Errorf("squawk: WithStorage is required")
 	}
+	if cfg.serviceName == "" {
+		return nil, fmt.Errorf("squawk: WithServiceName is required")
+	}
 
 	mp := cfg.meterProvider
 	if mp == nil {
@@ -106,18 +118,23 @@ func New(fr *trace.FlightRecorder, opts ...Option) (*Recorder, error) {
 		lp = noop.NewLoggerProvider()
 	}
 
-	sig, err := newSignaler(mp, lp, cfg.attrs)
+	attrs := append([]attribute.KeyValue{
+		attribute.String("service.name", cfg.serviceName)},
+		cfg.attrs...,
+	)
+	sig, err := newSignaler(mp, lp, attrs)
 	if err != nil {
 		return nil, fmt.Errorf("squawk: init metrics: %w", err)
 	}
 
 	return &Recorder{
-		fr:        fr,
-		storage:   cfg.storage,
-		signal:    sig,
-		limiter:   newRateLimiter(cfg.minInterval, cfg.burst),
-		extractor: cfg.extractor,
-		bufPool:   sync.Pool{New: func() any { return new(bytes.Buffer) }},
+		fr:          fr,
+		storage:     cfg.storage,
+		signal:      sig,
+		limiter:     newRateLimiter(cfg.minInterval, cfg.burst),
+		extractor:   cfg.extractor,
+		serviceName: cfg.serviceName,
+		bufPool:     sync.Pool{New: func() any { return new(bytes.Buffer) }},
 	}, nil
 }
 
@@ -147,7 +164,7 @@ func (r *Recorder) Snapshot(ctx context.Context, reason string) (Ref, error) {
 
 	// data is valid for the lifetime of buf; pass via bytes.Reader so Put can read it while buf remains usable for the pool
 	data := buf.Bytes()
-	key := buildKey(reason, r.signal.attrs, start)
+	key := buildKey(reason, r.serviceName, start)
 
 	ref, storErr := r.storage.Put(ctx, key, bytes.NewReader(data), n)
 
@@ -177,14 +194,7 @@ func (r *Recorder) Snapshot(ctx context.Context, reason string) (Ref, error) {
 }
 
 // buildKey returns traces/{service}/{YYYY-MM-DD}/{unixnano}-{reason}.trace
-func buildKey(reason string, attrs []attribute.KeyValue, t time.Time) string {
-	service := "unknown"
-	for _, kv := range attrs {
-		if string(kv.Key) == "service.name" {
-			service = kv.Value.AsString()
-			break
-		}
-	}
+func buildKey(reason, service string, t time.Time) string {
 	return fmt.Sprintf("traces/%s/%s/%d-%s.trace",
 		service,
 		t.UTC().Format(time.DateOnly),

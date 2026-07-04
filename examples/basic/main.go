@@ -92,11 +92,11 @@ func main() {
 	// -- Squawk recorder --
 	rec, err := squawk.New(fr,
 		squawk.WithStorage(&squawk.LocalStorage{Dir: dir}),
+		squawk.WithServiceName("example-service"),
 		squawk.WithMeterProvider(mp),
 		squawk.WithLoggerProvider(&consoleLogProvider{}),
 		squawk.WithRateLimit(500*time.Millisecond, 3),
 		squawk.WithResourceAttrs(
-			attribute.String("service.name", "example-service"),
 			attribute.String("host.name", "localhost"),
 		),
 	)

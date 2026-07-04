@@ -20,6 +20,9 @@ When you call `Snapshot`, squawk:
 Storage failures still emit the signal. A rate limiter prevents a crash-loop from flooding storage; suppressed snapshots
 increment a `squawk.dropped` counter so suppression is never silent.
 
+`Snapshot` performs blocking I/O (the storage write) on the calling goroutine. If you're calling it from a
+latency-sensitive path, invoke it from your own goroutine instead.
+
 ## Installation
 
 ```
@@ -34,7 +37,6 @@ Requires Go 1.25+.
 import (
 "runtime/trace"
 squawk "github.com/rashmi-tondare/go-squawk"
-"go.opentelemetry.io/otel/attribute"
 )
 
 fr := trace.NewFlightRecorder(trace.FlightRecorderConfig{MinAge: 5 * time.Second})
@@ -43,11 +45,9 @@ defer fr.Stop()
 
 rec, err := squawk.New(fr,
 squawk.WithStorage(&squawk.LocalStorage{Dir: "/var/traces"}),
+squawk.WithServiceName("my-service"),
 squawk.WithMeterProvider(mp), // your OTel MeterProvider
 squawk.WithLoggerProvider(lp), // your OTel LoggerProvider
-squawk.WithResourceAttrs(
-attribute.String("service.name", "my-service"),
-),
 )
 
 // Call this whenever you detect an anomaly.
@@ -100,9 +100,9 @@ Every snapshot attempt emits:
 | `squawk.snapshot.duration` | histogram | same                                                         |
 | `squawk.dropped`           | counter   | `reason`                                                     |
 
-A WARN log record is also emitted with attributes `squawk.reason`, `squawk.uri`, `squawk.bytes`, plus any resource
-attributes you set via `WithResourceAttrs`. You can alert on either the metric or the log record in your monitoring
-backend.
+A WARN log record is also emitted with attributes `squawk.reason`, `squawk.uri`, `squawk.bytes`, `service.name`
+plus any resource attributes you set via `WithResourceAttrs`. You can alert on either the metric or the log record in
+your monitoring backend.
 
 `WithMeterProvider` accepts any standard OTel `metric.MeterProvider`, so any exporter works: Prometheus, OTLP, Datadog,
 etc. For Prometheus:
@@ -133,11 +133,12 @@ Suppressed snapshots return an empty `Ref` and no error, but always increment `s
 
 | Option                      | Description                                                                   |
 |-----------------------------|-------------------------------------------------------------------------------|
-| `WithStorage(s)`            | Storage backend                                                               |
+| `WithStorage(s)`            | Storage backend. Required.                                                   |
+| `WithServiceName(name)`     | Service name used in the storage key path and as the `service.name` attribute on every metric and log record. Required. |
 | `WithMeterProvider(mp)`     | OTel meter provider                                                           |
 | `WithLoggerProvider(lp)`    | OTel logger provider                                                          |
 | `WithRateLimit(min, burst)` | Token-bucket rate limit. Default: 1s / burst 1.                               |
-| `WithResourceAttrs(kvs...)` | Resource attributes added to every metric and log record                      |
+| `WithResourceAttrs(kvs...)` | Additional resource attributes added to every metric and log record          |
 | `WithExtractor(e)`          | Async consumer of raw snapshot bytes. Runs in a goroutine; errors are ignored |
 
 ## Implementing your own storage

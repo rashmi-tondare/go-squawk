@@ -11,7 +11,6 @@ import (
 	"testing"
 	"time"
 
-	"go.opentelemetry.io/otel/attribute"
 	otellog "go.opentelemetry.io/otel/log"
 	"go.opentelemetry.io/otel/log/embedded"
 	sdkmetric "go.opentelemetry.io/otel/sdk/metric"
@@ -147,8 +146,16 @@ func TestNew(t *testing.T) {
 			wantErr: true,
 		},
 		{
-			name:    "with storage succeeds",
+			name:    "no service name returns error",
 			opts:    []squawk.Option{squawk.WithStorage(&memStorage{})},
+			wantErr: true,
+		},
+		{
+			name: "with storage and service name succeeds",
+			opts: []squawk.Option{
+				squawk.WithStorage(&memStorage{}),
+				squawk.WithServiceName("test-svc"),
+			},
 			wantErr: false,
 		},
 	}
@@ -220,9 +227,9 @@ func TestSnapshot(t *testing.T) {
 
 			rec, err := squawk.New(fr,
 				squawk.WithStorage(store),
+				squawk.WithServiceName("test-svc"),
 				squawk.WithMeterProvider(mp),
 				squawk.WithLoggerProvider(lp),
-				squawk.WithResourceAttrs(attribute.String("service.name", "test-svc")),
 			)
 			if err != nil {
 				t.Fatalf("New: %v", err)
@@ -309,6 +316,7 @@ func TestRateLimit(t *testing.T) {
 
 			rec, err := squawk.New(fr,
 				squawk.WithStorage(store),
+				squawk.WithServiceName("test-svc"),
 				squawk.WithMeterProvider(mp),
 				squawk.WithRateLimit(10*time.Second, tc.burst),
 			)
