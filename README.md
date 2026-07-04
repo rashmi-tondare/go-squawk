@@ -1,5 +1,9 @@
 # go-squawk
 
+[![Go](https://github.com/rashmi-tondare/go-squawk/actions/workflows/go.yml/badge.svg)](https://github.com/rashmi-tondare/go-squawk/actions/workflows/go.yml)
+[![Go Reference](https://pkg.go.dev/badge/github.com/rashmi-tondare/go-squawk.svg)](https://pkg.go.dev/github.com/rashmi-tondare/go-squawk)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
+
 The name comes from aviation: a squawk code is the four-digit transponder signal a pilot sets to declare an emergency.
 It pairs intentionally with Go's `runtime/trace.FlightRecorder`: when your program detects something wrong, it squawks.
 
