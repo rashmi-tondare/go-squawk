@@ -1,6 +1,6 @@
 // Package cloud provides a squawk.Storage adapter over gocloud.dev/blob,
 // supporting S3, GCS, Azure Blob, local filesystem, and in-memory backends
-// through a single URL-based configuration string.
+// through a single URL-based configuration string
 //
 // Import the provider driver you need alongside this package, e.g.:
 //

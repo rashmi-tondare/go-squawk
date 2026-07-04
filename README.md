@@ -84,10 +84,13 @@ squawk.WithStorage(bucket)
 ```
 
 The `storage/cloud` package wraps [gocloud.dev/blob](https://gocloud.dev/howto/blob/), so any backend it supports works
-here. Import the driver you need alongside the package.
+here. Import the driver you need alongside the package. Each driver has its own URL parameters; see the [gocloud.dev/howto/blob](https://gocloud.dev/howto/blob/) docs for your provider.
 
 Object keys follow the format `traces/{service}/{YYYY-MM-DD}/{unixnano}-{reason}.trace`. Retention is not managed by the
 library; use your bucket's lifecycle policies.
+
+A runnable version of this example is in [examples/cloud](./examples/cloud); it uses an in-memory bucket so it works
+with no credentials, and shows how to swap in the S3/GCS/Azure drivers.
 
 ## OTel signals
 
