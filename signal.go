@@ -19,7 +19,7 @@ type signaler struct {
 }
 
 func newSignaler(mp metric.MeterProvider, lp otellog.LoggerProvider, attrs []attribute.KeyValue) (*signaler, error) {
-	m := mp.Meter("squawk", metric.WithInstrumentationVersion("0.1.0"))
+	m := mp.Meter("squawk")
 
 	snapshots, err := m.Int64Counter("squawk.snapshots",
 		metric.WithDescription("Number of flight-recorder snapshots attempted"))

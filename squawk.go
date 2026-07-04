@@ -1,4 +1,4 @@
-// Package squawk persists runtime/trace.FlightRecorder snapshots and emits
+// Package squawk persists trace.FlightRecorder snapshots and emits
 // observable signals (OTel metrics + log record) when an anomaly occurs.
 //
 // This is a Go execution trace library, NOT an OpenTelemetry distributed trace library.
@@ -124,6 +124,9 @@ func New(fr *trace.FlightRecorder, opts ...Option) (*Recorder, error) {
 // Snapshot captures the current flight-recorder window, persists it via the configured
 // Storage, and emits OTel metrics + a WARN log record. Rate-limited snapshots return a
 // zero Ref and no error; the squawk.dropped counter is incremented instead.
+//
+// Snapshot performs blocking I/O (storage writes) on the calling goroutine; callers on a
+// latency-sensitive path should invoke it from their own goroutine.
 func (r *Recorder) Snapshot(ctx context.Context, reason string) (Ref, error) {
 	if !r.limiter.Allow() {
 		r.signal.recordDropped(ctx, reason)
@@ -184,7 +187,7 @@ func buildKey(reason string, attrs []attribute.KeyValue, t time.Time) string {
 	}
 	return fmt.Sprintf("traces/%s/%s/%d-%s.trace",
 		service,
-		t.UTC().Format("2006-01-02"),
+		t.UTC().Format(time.DateOnly),
 		t.UnixNano(),
 		sanitizeReason(reason),
 	)
